@@ -1,5 +1,6 @@
 from PIL import Image
 from numpy import asarray, ndarray, array, uint8, delete
+import random
 
 # image = Image.open("images/hibou.jpg")
 
@@ -89,7 +90,35 @@ def generer_clous(tab_img: ndarray) -> list:
 def visible(clou1: tuple, clou2: tuple) -> bool:
     """Renvoie True si les clous se voient, False sinon"""
     return clou1[2] != clou2[2]
+    
+def clou_choisi_al(liste_clous : list) -> tuple:
+    return random.choice(liste_clous)
 
+def tracer_droite(clou1: tuple, clou2: tuple, image: list) -> list:
+    """Trace une droite d'un clou à un autre."""
+    if clou2[3]==clou1[3]:
+        print("il est impossible de tracer un trait sur le même bord")
+    else:
+        
+        pass
+
+def zone(image) -> list:
+    lst =[]
+    lst_coor_angle_zone=[]
+    hauteur = get_hauteur_img(image)
+    longeur = get_longueur_img(image)
+    pass
+
+def erreur_moyenne_zone(image1, image2, zone):
+    
+    pass
+
+def erreur(image1, image2, zones : list) -> float:
+    moy = 0
+    for i in range(len(zones)):
+        moy += erreur_moyenne_zone(image1, image2,zone[i])
+    return moy
+    pass
 
 image = import_image("images/hibou.jpg")
 print(image)
