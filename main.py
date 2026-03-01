@@ -1,14 +1,8 @@
+### Modules ###
+
 from PIL import Image
 from numpy import asarray, ndarray, array, uint8, delete
 from random import choice
-
-# image = Image.open("images/hibou.jpg")
-
-# image = image.convert("L")
-
-# img_array = asarray(image)
-
-# print(len(img_array[0])//3)
 
 
 ### Fonctions ###
@@ -82,13 +76,13 @@ def generer_clous(tab_img: ndarray) -> list:
     l = get_longueur_img(tab_img)
 
     for i in range(0, l, 10):
-        liste_res = liste_res + [(0, i, 0)]
+        liste_res = liste_res + [(i, 0, 0)]
     for i in range(10, h, 10):
-        liste_res = liste_res + [(i, l - 1, 1)]
-    for i in range(0, l - 10, 10):
-        liste_res = liste_res + [(h - 1, i, 2)]
-    for i in range(10, h - 10, 10):
-        liste_res = liste_res + [(i, 0, 3)]
+        liste_res = liste_res + [(l - 1, i, 1)]
+    for i in range(l - 11, -1, - 10):
+        liste_res = liste_res + [(i, h - 1, 2)]
+    for i in range(h - 11, 0, -10):
+        liste_res = liste_res + [(0, i, 3)]
 
     return liste_res
 
@@ -100,13 +94,102 @@ def clou_choisi_al(liste_clous : list) -> tuple:
     """On choisie un clou aléatoirement"""
     return random.choice(liste_clous)
 
-def tracer_droite(clou1: tuple, clou2: tuple, image: list) -> list:
+def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
     """Trace une droite d'un clou à un autre."""
-    if clou2[3]==clou1[3]:
-        print("il est impossible de tracer un trait sur le même bord")
-    else:
+    if visible(clou1, clou2):
+        liste_points = liste_points_traverses(clou1, clou2, image)
         
-        pass
+        for i in range(0, len(liste_points)):
+            ligne = liste_points[i][1]
+            col = liste_points[i][0]
+            image = assombrir_pixel(image, ligne, col)
+    else:
+        print("il est impossible de tracer un trait sur le même bord")
+
+    return image
+
+def liste_points_traverses(clou1: tuple, clou2: tuple, image: ndarray) -> list:
+    """Renvoie les points traversés par le segment [coul1, clou2] traverse"""
+    liste_res = []
+    liste_motif = liste_points_traverses_par_motif(clou1, clou2, image)
+
+    l = get_longueur_img(image)
+    h = get_hauteur_img(image)
+
+    x1 = clou1[0]
+    x2 = clou2[0]
+    y1 = clou1[1]
+    y2 = clou2[1]
+
+    # On inverse l'ordre des clous si besoin, ça pourrait être fait de façon plus propre
+    if x1 > x2:
+        clou1, clou2, x1, x2, y1, y2 = clou2, clou1, x2, x1, y2, y1
+    elif x1 == x2:
+        if y1 > y2:
+            clou1, clou2, x1, x2, y1, y2 = clou2, clou1, x2, x1, y2, y1
+
+    # On applique le motif depuis le point de départ, et on ajoute les points obtenus dans la liste si ils rentrent dans l'image
+    for i in range(0, len(liste_motif)):
+            if (liste_motif[i][0] + x1 < l) and (0 <= liste_motif[i][1] + y1) and (liste_motif[i][1] + y1 < h):
+                liste_res = liste_res + [(liste_motif[i][0] + x1, liste_motif[i][1] + y1)]
+        
+    return liste_res
+
+
+def liste_points_traverses_par_motif(clou1: tuple, clou2: tuple, image: ndarray) -> list:
+    """Renvoie la liste des points que le motif de la doite passant par clou1 et clou2 traverse"""
+    liste_res = []
+
+    l = get_longueur_img(image)
+    h = get_hauteur_img(image)
+
+    x1 = clou1[0]
+    x2 = clou2[0]
+
+    # On échange les clous si besoin, pourrait toujours être fait plus proprement
+    if x1 > x2:
+        clou1, clou2 = clou2, clou1
+    # Gestion des droites verticales
+    elif x1 == x2:
+        liste_res = [(0, i) for i in range(0, h)]
+
+    a, b = calcul_droite(clou1, clou2)
+
+    y1 = clou1[1]
+    y2 = clou2[1]
+
+    mu = 0
+
+    # Si la droite "descend"
+    if y1 < y2:
+        # On teste tous les pixels, ça peut être grandement optimisé
+        for x in range(0, l):
+            for y in range(0, h):
+                # On calcule un "reste" (ax + by) qui lorsqu'il se trouve entre mu et mu + max(a, b) permet de créer un motif. On dessine ici le motif à partir de l'origine
+                if (mu <= a * x + b * y) and (a * x + b * y < mu + max(a, b)):
+                    liste_res = liste_res + [(x, y)]
+
+    # Si la droite "monte"
+    else:
+        for x in range(0, l):
+            for y in range(0, h):
+                # Pareil qu'au dessus, sauf que le reste vaut (ax - by) et qu'on trace le motif à partir du point en bas à gauche
+                if (mu <= a * x - b * y) and (a * x - b * y < mu + max(a,  b)):
+                    liste_res = liste_res + [(x, - y)]
+
+    return liste_res
+
+def calcul_droite(clou1: tuple, clou2: tuple) -> tuple:
+    """Renvoie les coordonnées du vecteur orthogonal au vecteur allant de clou1 à clou2"""
+    x1 = clou1[0]
+    x2 = clou2[0]
+    y1 = clou1[1]
+    y2 = clou2[1]
+
+    a = y1 - y2
+    b = x2 - x1    
+
+    return (a, b)
 
 def lst_zone(image) -> list:
     """Renvoie une liste avec les coordonées de chaques zones"""
@@ -116,7 +199,7 @@ def lst_zone(image) -> list:
     pas = 10
     for i in range(0,longueur,pas):
         for j in range(0,hauteur, pas):
-            lst += [(i,j)] #prends les coordonnées du pixel en haut à gauche de chaque zone
+            lst += [(i,j)] # prends les coordonnées du pixel en haut à gauche de chaque zone
     return lst  
 
 def erreur_moyenne_zone(image1, image2, zone : tuple, longueur : int)  -> float:
@@ -144,14 +227,20 @@ def erreur(image1, image2, zones : list) -> float:
         moy += erreur_moyenne_zone(image1, image2,zones[i])
     return moy/len(zones)
 
+
+
+
+
+### Tests (à nettoyer) ###
+
 image = import_image("images/hibou.jpg")
-print(image)
+# print(image)
+# print(len(image))
+# print(len(image[0]))
 
 image_blanche = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
 
 image_noir = tab_image_noir(get_longueur_img(image), get_hauteur_img(image))
-
-print(image_blanche)
 
 img = Image.fromarray(uint8(image_blanche))
 
@@ -162,20 +251,27 @@ for i in range(0, 50):
 img = Image.fromarray(uint8(image_blanche))
 #img.show()
 
-print(image_blanche)
+#print(image_blanche)
 
 clous = generer_clous(image_blanche)
-print(clous)
+#print(clous)
 
-test = tab_image_blanche(111, 111)
+test = tab_image_blanche(1000, 1000)
 c = generer_clous(test)
+
 for i in range(0, len(c)):
     test = assombrir_pixel(test, c[i][0], c[i][1])
+test = tracer_droite(c[35], c[321], test)
+
 im_test = Image.fromarray(uint8(test))
 im_test.show()
 
 l_zones = lst_zone(image)
-print(erreur_moyenne_zone(image, image_blanche,l_zones[500],10))
+# print(erreur_moyenne_zone(image, image_blanche,l_zones[500],10))
+
+
+
+
 ### TODO ###
 
 # On peut essayer de regarder des clous aléatoire plutôt que de tout tester
