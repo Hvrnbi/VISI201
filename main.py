@@ -8,7 +8,7 @@ from random import choice
 ### Fonctions ###
 
 def import_image(chemin: str) -> ndarray :
-    """Charge l'image donnée, la passe en nuances de gris, et la convertie en tableau (de numpy)"""
+    """Charge l'image donnée, la passe en nuances de gris, et la convertit en tableau (de numpy)"""
 
     ## Chargement de l'image ## 
 
@@ -48,7 +48,7 @@ def tab_image_blanche(longueur: int, hauteur: int) -> ndarray:
     return array(tab)
     
 def tab_image_noir(longueur: int, hauteur: int) -> ndarray:
-    """Génère un tableau contenant des pixels blancs avec les dimensions données"""
+    """Génère un tableau contenant des pixels noirs avec les dimensions données"""
     # On crée autant de lignes que de pixels de hauteur, et autant de pixels que de hauteur
     tab = [ [0] * longueur] * hauteur
     return array(tab)
@@ -92,7 +92,7 @@ def visible(clou1: tuple, clou2: tuple) -> bool:
     
 def clou_choisi_al(liste_clous : list) -> tuple:
     """On choisie un clou aléatoirement"""
-    return random.choice(liste_clous)
+    return choice(liste_clous)
 
 def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
     """Trace une droite d'un clou à un autre."""
@@ -109,7 +109,7 @@ def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
     return image
 
 def liste_points_traverses(clou1: tuple, clou2: tuple, image: ndarray) -> list:
-    """Renvoie les points traversés par le segment [coul1, clou2] traverse"""
+    """Renvoie les points que le segment [coul1, clou2] traverse"""
     liste_res = []
     liste_motif = liste_points_traverses_par_motif(clou1, clou2, image)
 
