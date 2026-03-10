@@ -89,7 +89,15 @@ def generer_clous(tab_img: ndarray) -> list:
 def visible(clou1: tuple, clou2: tuple) -> bool:
     """Renvoie True si les clous se voient, False sinon"""
     return clou1[2] != clou2[2]
-    
+
+def liste_clous_al(liste_clous : list, taille_l : int) -> list:
+    """On créer une liste de clou choisis aléatoirement"""
+    lst = []
+    for i in range(taille_l):
+        clou = clou_choisi_al(liste_clous)
+        lst += [clou]
+    return lst
+
 def clou_choisi_al(liste_clous : list) -> tuple:
     """On choisie un clou aléatoirement"""
     return choice(liste_clous)
