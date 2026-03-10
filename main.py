@@ -191,7 +191,7 @@ def calcul_droite(clou1: tuple, clou2: tuple) -> tuple:
 
     return (a, b)
 
-def lst_zone(image) -> list:
+def lst_zone(image: ndarray) -> list:
     """Renvoie une liste avec les coordonées de chaques zones"""
     lst = []
     hauteur = get_hauteur_img(image)
@@ -199,10 +199,10 @@ def lst_zone(image) -> list:
     pas = 10
     for i in range(0,longueur,pas):
         for j in range(0,hauteur, pas):
-            lst += [(i,j)] # prends les coordonnées du pixel en haut à gauche de chaque zone
+            lst += [(j, i)] #prends les coordonnées du pixel en haut à gauche de chaque zone
     return lst  
 
-def erreur_moyenne_zone(image1, image2, zone : tuple, longueur : int)  -> float:
+def erreur_moyenne_zone(image1: ndarray, image2: ndarray, zone : tuple, longueur : int)  -> float:
     """Renvoie l'erreur moyenne pour une zone"""
     haut = get_hauteur_img(image1)
     long = get_longueur_img(image1)
@@ -211,21 +211,58 @@ def erreur_moyenne_zone(image1, image2, zone : tuple, longueur : int)  -> float:
     pix1 = image1[coo1][coo2]
     pix2 = image2[coo1][coo2]
     diff = abs(pix1 - pix2)
-    for i in range(coo1, coo1+longueur):
-        for j in range(coo2, coo2+longueur):
-            if i != 0 and j != 0:
+    for i in range(coo1, longueur):
+        for j in range(coo2, longueur):
+            if i != 0 and j != 0 :
                 if i > long and j > haut:
                     pix1 = image1[i][j]
                     pix2 = image2[i][j]
                     diff += abs(pix1 - pix2)
     return (diff / (longueur * longueur *255)) * 100
 
-def erreur(image1, image2, zones : list) -> float:
+def erreur(image1: ndarray, image2: ndarray, zones : list, longueur : int) -> float:
     """Renvoie l'erreur moyenne entre les deux images"""
     moy = 0
     for i in range(len(zones)):
-        moy += erreur_moyenne_zone(image1, image2,zones[i])
+        moy += erreur_moyenne_zone(image1, image2, zones[i], longueur)
     return moy/len(zones)
+
+def teste_5_clous_al(img1: ndarray, img2: ndarray, clou_dep, l_clous_img2 :list):
+    """Calcul quel clou reduis le plus l'erreur moyenne"""
+    lst_c_al = liste_clous_al(l_clous_img2, 50)
+    zones = lst_zone(img1)
+    erreur_dep = erreur(img1, img2, zones, 10)
+    nv_erreur = erreur_dep
+    i = 0
+    clou = lst_c_al[0]
+    while i < len(lst_c_al):
+        img_temp = deepcopy(img2)
+        clou_arr = lst_c_al[i]
+        img_temp = tracer_droite(clou_dep, clou_arr, img_temp)
+        erreur_temp = erreur(img1, img_temp, zones, 10)
+        if erreur_temp < nv_erreur:
+            nv_erreur = erreur_temp
+            clou = clou_arr
+        i += 1
+    return (clou, nv_erreur)
+
+def tracer_image(img1: ndarray, img2: ndarray, clou_dep, l_clous_img2 :list):
+    """Fais un filage de la première image sur la deuxième image qui est blanche."""
+    compteur = 0
+    zones = lst_zone(img1)
+    erreur_d = erreur(img1, img2, zones, 10)
+    derniere_erreur = erreur_d
+    droites_tracees = 0
+    while compteur < 8 and droites_tracees < 100: 
+        res = teste_5_clous_al(img1, img2, clou_dep, l_clous_img2)
+        clou_arr = res[0]
+        derniere_erreur = res[1]
+        img2 = tracer_droite(clou_dep, clou_arr, img2)
+        if derniere_erreur >= erreur_d:
+            compteur += 1
+        droites_tracees = droites_tracees + 1
+        clou_dep = clou_arr
+    return img2
 
 
 
@@ -233,7 +270,7 @@ def erreur(image1, image2, zones : list) -> float:
 
 ### Tests (à nettoyer) ###
 
-image = import_image("images/hibou.jpg")
+image = import_image("images/cercle.jpg")
 # print(image)
 # print(len(image))
 # print(len(image[0]))
@@ -269,6 +306,10 @@ im_test.show()
 l_zones = lst_zone(image)
 # print(erreur_moyenne_zone(image, image_blanche,l_zones[500],10))
 
+img = tracer_image(image, image_blanche, (0,0,0), clous)
+
+imaaaaaage = Image.fromarray(uint8(img))
+imaaaaaage.show()
 
 
 
