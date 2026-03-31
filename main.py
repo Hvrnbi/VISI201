@@ -2,12 +2,13 @@
 
 from PIL import Image
 from numpy import asarray, ndarray, array, uint8, delete
-from random import choice
+from random import choices
+from copy import deepcopy
 
 
 ### Fonctions ###
 
-def import_image(chemin: str) -> ndarray :
+def import_image(chemin: str, resize: bool = False) -> ndarray :
     """Charge l'image donnée, la passe en nuances de gris, et la convertit en tableau (de numpy)"""
 
     ## Chargement de l'image ## 
@@ -31,6 +32,9 @@ def import_image(chemin: str) -> ndarray :
 
     # On utilise la méthode .convert() de PIL
     image = image.convert("L")
+
+    if resize:
+        image = image.resize((256, 256))
 
 
     ## Conversion en tableau ##
@@ -90,243 +94,164 @@ def visible(clou1: tuple, clou2: tuple) -> bool:
     """Renvoie True si les clous se voient, False sinon"""
     return clou1[2] != clou2[2]
 
-def liste_clous_al(liste_clous : list, taille_l : int) -> list:
-    """On créer une liste de clou choisis aléatoirement"""
-    lst = []
-    for i in range(taille_l):
-        clou = clou_choisi_al(liste_clous)
-        lst += [clou]
-    return lst
-
-def clou_choisi_al(liste_clous : list) -> tuple:
-    """On choisie un clou aléatoirement"""
-    return choice(liste_clous)
-
 def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
     """Trace une droite d'un clou à un autre."""
     if visible(clou1, clou2):
-        liste_points = liste_points_traverses(clou1, clou2, image)
+        liste_points = liste_points_traverses(clou1[0], clou1[1], clou2[0], clou2[1])
         
         for i in range(0, len(liste_points)):
             ligne = liste_points[i][1]
             col = liste_points[i][0]
             image = assombrir_pixel(image, ligne, col)
-    else:
-        print("il est impossible de tracer un trait sur le même bord")
 
     return image
 
-def liste_points_traverses(clou1: tuple, clou2: tuple, image: ndarray) -> list:
-    """Renvoie les points que le segment [coul1, clou2] traverse"""
+def liste_points_traverses(x1: int, y1: int, x2: int, y2: int) -> list:
+    """Renvoie les points que le segment [(x1, y1), (x2, y2)] traverse"""
     liste_res = []
-    liste_motif = liste_points_traverses_par_motif(clou1, clou2, image)
+    a, b = calcul_droite(x1, y1, x2, y2)
 
-    l = get_longueur_img(image)
-    h = get_hauteur_img(image)
+    # Si l'angle entre l'axe des abscisses et la droite est compris entre -45° et 45°
+    if -1 <= a <= 1:
+        if x1 > x2:
+            # On cherche y pour chaque x, donc on commence du point dont le x est le plus proche de 0
+            x1, y1, x2, y2 = x2, y2, x1, y1
 
-    x1 = clou1[0]
-    x2 = clou2[0]
-    y1 = clou1[1]
-    y2 = clou2[1]
+        x = x1 + 1
+        y = y1
+        liste_res.append((x1, y))
 
-    # On inverse l'ordre des clous si besoin, ça pourrait être fait de façon plus propre
-    if x1 > x2:
-        clou1, clou2, x1, x2, y1, y2 = clou2, clou1, x2, x1, y2, y1
-    elif x1 == x2:
-        if y1 > y2:
-            clou1, clou2, x1, x2, y1, y2 = clou2, clou1, x2, x1, y2, y1
+        while x <= x2:
+            y = round(a * x + b)
+            liste_res.append((x, y))
+            x += 1
 
-    # On applique le motif depuis le point de départ, et on ajoute les points obtenus dans la liste si ils rentrent dans l'image
-    for i in range(0, len(liste_motif)):
-            if (liste_motif[i][0] + x1 < l) and (0 <= liste_motif[i][1] + y1) and (liste_motif[i][1] + y1 < h):
-                liste_res = liste_res + [(liste_motif[i][0] + x1, liste_motif[i][1] + y1)]
-        
-    return liste_res
-
-
-def liste_points_traverses_par_motif(clou1: tuple, clou2: tuple, image: ndarray) -> list:
-    """Renvoie la liste des points que le motif de la doite passant par clou1 et clou2 traverse"""
-    liste_res = []
-
-    l = get_longueur_img(image)
-    h = get_hauteur_img(image)
-
-    x1 = clou1[0]
-    x2 = clou2[0]
-
-    # On échange les clous si besoin, pourrait toujours être fait plus proprement
-    if x1 > x2:
-        clou1, clou2 = clou2, clou1
-    # Gestion des droites verticales
-    elif x1 == x2:
-        liste_res = [(0, i) for i in range(0, h)]
-
-    a, b = calcul_droite(clou1, clou2)
-
-    y1 = clou1[1]
-    y2 = clou2[1]
-
-    mu = 0
-
-    # Si la droite "descend"
-    if y1 < y2:
-        # On teste tous les pixels, ça peut être grandement optimisé
-        for x in range(0, l):
-            for y in range(0, h):
-                # On calcule un "reste" (ax + by) qui lorsqu'il se trouve entre mu et mu + max(a, b) permet de créer un motif. On dessine ici le motif à partir de l'origine
-                if (mu <= a * x + b * y) and (a * x + b * y < mu + max(a, b)):
-                    liste_res = liste_res + [(x, y)]
-
-    # Si la droite "monte"
     else:
-        for x in range(0, l):
-            for y in range(0, h):
-                # Pareil qu'au dessus, sauf que le reste vaut (ax - by) et qu'on trace le motif à partir du point en bas à gauche
-                if (mu <= a * x - b * y) and (a * x - b * y < mu + max(a,  b)):
-                    liste_res = liste_res + [(x, - y)]
+        if y1 > y2:
+            # On cherche x pour chaque y, donc on commence du point dont le y est le plus proche de 0
+            x1, y1, x2, y2 = x2, y2, x1, y1
 
+        if a != 999999999 and b != 999999999:
+            x = x1
+            y = y1 + 1
+            liste_res.append((x, y1))
+            while y <= y2:
+                x = round((y - b) / a)
+                liste_res.append((x, y))
+                y += 1
+
+        # Gestion des droites verticales
+        else:
+            x = x1
+            y = y1 + 1
+            liste_res.append((x, y1))
+            for i in range(y, y2 + 1):
+                liste_res.append((x, i))
+    
     return liste_res
 
-def calcul_droite(clou1: tuple, clou2: tuple) -> tuple:
-    """Renvoie les coordonnées du vecteur orthogonal au vecteur allant de clou1 à clou2"""
-    x1 = clou1[0]
-    x2 = clou2[0]
-    y1 = clou1[1]
-    y2 = clou2[1]
 
-    a = y1 - y2
-    b = x2 - x1    
+def calcul_droite(x1: int, y1: int, x2: int, y2: int) -> tuple:
+    """Renvoie le coefficient directeur et l'ordonnée à l'origine de la droite passant par (x1, y1) et (x2, y2)"""
+
+    if x1 != x2:
+        a = (y2 - y1) / (x2 - x1)
+        b = y1 - x1 * a
+
+    # Gestion des droites verticales
+    else:
+        a = 999999999
+        b = 999999999
 
     return (a, b)
 
-def lst_zone(image: ndarray) -> list:
-    """Renvoie une liste avec les coordonées de chaques zones"""
-    lst = []
-    hauteur = get_hauteur_img(image)
-    longueur = get_longueur_img(image)
-    pas = 10
-    for i in range(0,longueur,pas):
-        for j in range(0,hauteur, pas):
-            lst += [(j, i)] #prends les coordonnées du pixel en haut à gauche de chaque zone
-    return lst  
 
-def erreur_moyenne_zone(image1: ndarray, image2: ndarray, zone : tuple, longueur : int)  -> float:
-    """Renvoie l'erreur moyenne pour une zone"""
-    haut = get_hauteur_img(image1)
-    long = get_longueur_img(image1)
-    coo1 = zone[0]
-    coo2 = zone[1]
-    pix1 = image1[coo1][coo2]
-    pix2 = image2[coo1][coo2]
-    diff = abs(pix1 - pix2)
-    for i in range(coo1, longueur):
-        for j in range(coo2, longueur):
-            if i != 0 and j != 0 :
-                if i > long and j > haut:
-                    pix1 = image1[i][j]
-                    pix2 = image2[i][j]
-                    diff += abs(pix1 - pix2)
-    return (diff / (longueur * longueur *255)) * 100
-
-def erreur(image1: ndarray, image2: ndarray, zones : list, longueur : int) -> float:
-    """Renvoie l'erreur moyenne entre les deux images"""
-    moy = 0
-    for i in range(len(zones)):
-        moy += erreur_moyenne_zone(image1, image2, zones[i], longueur)
-    return moy/len(zones)
-
-def teste_5_clous_al(img1: ndarray, img2: ndarray, clou_dep, l_clous_img2 :list):
-    """Calcul quel clou reduis le plus l'erreur moyenne"""
-    lst_c_al = liste_clous_al(l_clous_img2, 50)
-    zones = lst_zone(img1)
-    erreur_dep = erreur(img1, img2, zones, 10)
-    nv_erreur = erreur_dep
-    i = 0
-    clou = lst_c_al[0]
-    while i < len(lst_c_al):
-        img_temp = deepcopy(img2)
-        clou_arr = lst_c_al[i]
-        img_temp = tracer_droite(clou_dep, clou_arr, img_temp)
-        erreur_temp = erreur(img1, img_temp, zones, 10)
-        if erreur_temp < nv_erreur:
-            nv_erreur = erreur_temp
-            clou = clou_arr
-        i += 1
-    return (clou, nv_erreur)
-
-def tracer_image(img1: ndarray, img2: ndarray, clou_dep, l_clous_img2 :list):
-    """Fais un filage de la première image sur la deuxième image qui est blanche."""
-    compteur = 0
-    zones = lst_zone(img1)
-    erreur_d = erreur(img1, img2, zones, 10)
-    derniere_erreur = erreur_d
-    droites_tracees = 0
-    while compteur < 8 and droites_tracees < 100: 
-        res = teste_5_clous_al(img1, img2, clou_dep, l_clous_img2)
-        clou_arr = res[0]
-        derniere_erreur = res[1]
-        img2 = tracer_droite(clou_dep, clou_arr, img2)
-        if derniere_erreur >= erreur_d:
-            compteur += 1
-        droites_tracees = droites_tracees + 1
-        clou_dep = clou_arr
-    return img2
+def liste_clous_al(liste_clous : list, taille_l : int) -> list:
+    """On créer une liste de clou choisis aléatoirement"""
+    lst_res = choices(liste_clous, k=taille_l)
+    return lst_res
 
 
+def reduction_erreur_droite(x1: int, x2: int, y1: int, y2: int, img1:  ndarray, img2: ndarray) -> float:
+    """Renvoie la différence entre l'erreur de l'image cible et de l'image actuelle, et l'erreur de l'image cible et de l'image actuelel si on traçait la droite donnée"""
+    lst_pts = liste_points_traverses(x1, x2, y1, y2)
+    err_act = 0
+    nb_pts = len(lst_pts)
+
+    if (x1 == 0 and x2 == 0) or (x1 == get_longueur_img(img2) and x2 == get_longueur_img(img2)) or (y1 == 0 and y2 == 0) or (y1 == get_hauteur_img(img2) and y2 == get_hauteur_img(img2)):
+        return 999999999
+
+    for i in range(0, nb_pts):
+        err_act += erreur_point(lst_pts[i], img1, img2)
+
+    new_err = 0
+
+    for i in range(0, nb_pts):
+        new_err += erreur_point_trace(lst_pts[i], img1, img2)
+    
+    return (new_err - err_act) / nb_pts
+
+
+def erreur_point(p: tuple, img1: ndarray, img2: ndarray):
+    """Renvoie la différence entre la valeur du pixel sur l'image 1 et la valeur du pixel sur l'image 2"""
+    return abs(img1[p[1]][p[0]] - img2[p[1]][p[0]])
+
+
+def erreur_point_trace(p: tuple, img1: ndarray, img2: ndarray):
+    """Renvoie la différence entre la valeur du pixel sur l'image 1 et la valeur du pixel sur l'image 2 lorsqu'on assombrit ce pixel"""
+    if img2[p[1]][p[0]] >= 51:
+        return abs(img1[p[1]][p[0]] - img2[p[1]][p[0]] + 51)
+    else:
+        return erreur_point(p, img1, img2)
+
+
+def trouve_meilleure_droite(img1: ndarray, img2: ndarray, clou_dep: tuple, lst_clous: list) -> tuple:
+    """Renvoie le clou dont la droite le traversant lui et le clou de départ réduit le plus l'erreur entre les deux images"""
+    liste_c = liste_clous_al(lst_clous, len(lst_clous) // 2)
+    liste_red_err = []
+
+    for i in range(0, len(liste_c)):
+        liste_red_err.append(reduction_erreur_droite(clou_dep[0], clou_dep[1], liste_c[i][0], liste_c[i][1], img1, img2))
+    
+    red_err = min(liste_red_err)
+    meilleur_clou = liste_c[liste_red_err.index(red_err)]
+
+    return (meilleur_clou, red_err)
+
+
+def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec des fils et sauvegarde dans le dossier resultat, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
+
+    clous = generer_clous(new_img)
+
+    clou_dep = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 2:
+        meilleur_clou, reduction_err = trouve_meilleure_droite(image, new_img, clou_dep, clous)
+        new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+        if reduction_err >= 0:
+            cpt_augmentation_err += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultat/" + nom_image_sortie + ".png")
 
 
 
-### Tests (à nettoyer) ###
+### Tests ###
 
-image = import_image("images/cercle.jpg")
-# print(image)
-# print(len(image))
-# print(len(image[0]))
-
-image_blanche = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
-
-image_noir = tab_image_noir(get_longueur_img(image), get_hauteur_img(image))
-
-img = Image.fromarray(uint8(image_blanche))
-
-for i in range(0, 50):
-    for j in range(0, 50):
-            image_blanche = assombrir_pixel(image_blanche, i, j)
-
-img = Image.fromarray(uint8(image_blanche))
-#img.show()
-
-#print(image_blanche)
-
-clous = generer_clous(image_blanche)
-#print(clous)
-
-test = tab_image_blanche(1000, 1000)
-c = generer_clous(test)
-
-for i in range(0, len(c)):
-    test = assombrir_pixel(test, c[i][0], c[i][1])
-test = tracer_droite(c[35], c[321], test)
-
-im_test = Image.fromarray(uint8(test))
-im_test.show()
-
-l_zones = lst_zone(image)
-# print(erreur_moyenne_zone(image, image_blanche,l_zones[500],10))
-
-img = tracer_image(image, image_blanche, (0,0,0), clous)
-
-imaaaaaage = Image.fromarray(uint8(img))
-imaaaaaage.show()
-
+retrace_image("images/losa.jpg", "losa-egzbogez")
 
 
 ### TODO ###
-
-# On peut essayer de regarder des clous aléatoire plutôt que de tout tester
-
-# On regarde l'erreur sur la ligne qu'on vient de tracer, en faisant des moyennes par zones
-
-# Pas forcément la même résolution pour le calcul que pour l'image
 
 # Pas forcément mesurer l'erreur d'une bande de quelques pixels au bord si on met les clous dedans
