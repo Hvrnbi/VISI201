@@ -34,7 +34,7 @@ def import_image(chemin: str, resize: bool = False) -> ndarray :
     image = image.convert("L")
 
     if resize:
-        image = image.resize((256, 256))
+        image = image.resize((400, 400))
 
 
     ## Conversion en tableau ##
@@ -172,14 +172,16 @@ def liste_clous_al(liste_clous : list, taille_l : int) -> list:
     return lst_res
 
 
-def reduction_erreur_droite(x1: int, x2: int, y1: int, y2: int, img1:  ndarray, img2: ndarray) -> float:
+def reduction_erreur_droite(clou_dep: tuple, clou_arr: tuple, img1: ndarray, img2: ndarray) -> float:
     """Renvoie la différence entre l'erreur de l'image cible et de l'image actuelle, et l'erreur de l'image cible et de l'image actuelel si on traçait la droite donnée"""
-    lst_pts = liste_points_traverses(x1, x2, y1, y2)
+    
+    if not visible(clou_dep, clou_arr):
+        return 999999999
+    
+
+    lst_pts = liste_points_traverses(clou_dep[0], clou_dep[1], clou_arr[0], clou_arr[1])
     err_act = 0
     nb_pts = len(lst_pts)
-
-    if (x1 == 0 and x2 == 0) or (x1 == get_longueur_img(img2) and x2 == get_longueur_img(img2)) or (y1 == 0 and y2 == 0) or (y1 == get_hauteur_img(img2) and y2 == get_hauteur_img(img2)):
-        return 999999999
 
     for i in range(0, nb_pts):
         err_act += erreur_point(lst_pts[i], img1, img2)
@@ -211,10 +213,11 @@ def trouve_meilleure_droite(img1: ndarray, img2: ndarray, clou_dep: tuple, lst_c
     liste_red_err = []
 
     for i in range(0, len(liste_c)):
-        liste_red_err.append(reduction_erreur_droite(clou_dep[0], clou_dep[1], liste_c[i][0], liste_c[i][1], img1, img2))
+        liste_red_err.append(reduction_erreur_droite(clou_dep, liste_c[i], img1, img2))
     
     red_err = min(liste_red_err)
     meilleur_clou = liste_c[liste_red_err.index(red_err)]
+    print(red_err, clou_dep, meilleur_clou)
 
     return (meilleur_clou, red_err)
 
@@ -231,14 +234,22 @@ def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = 
     cpt_augmentation_err = 0
     cpt_droites = 0
 
-    while cpt_augmentation_err < 2:
+    while cpt_augmentation_err < 3:
         meilleur_clou, reduction_err = trouve_meilleure_droite(image, new_img, clou_dep, clous)
-        new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
-        clou_dep = meilleur_clou
-        cpt_droites += 1
 
         if reduction_err >= 0:
             cpt_augmentation_err += 1
+        # On ne trace la droite que si elle réduit l'erreur
+        else:
+            new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
+
+
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+        if cpt_droites % 5000 == 0:
+            img_prov = Image.fromarray(uint8(new_img))
+            img_prov.show()
 
     print(cpt_droites)
 
@@ -249,7 +260,7 @@ def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = 
 
 ### Tests ###
 
-retrace_image("images/losa.jpg", "losa-egzbogez")
+retrace_image("images/oiseau.jpg", "oiseau-400px", True)
 
 
 ### TODO ###
