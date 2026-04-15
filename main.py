@@ -2,7 +2,7 @@
 
 from PIL import Image
 from numpy import asarray, ndarray, array, uint8, delete
-from random import choices
+from random import choices, randint
 from copy import deepcopy
 
 
@@ -34,7 +34,7 @@ def import_image(chemin: str, resize: bool = False) -> ndarray :
     image = image.convert("L")
 
     if resize:
-        image = image.resize((400, 400))
+        image = image.resize((300, 400))
 
 
     ## Conversion en tableau ##
@@ -50,20 +50,31 @@ def tab_image_blanche(longueur: int, hauteur: int) -> ndarray:
     # On crée autant de lignes que de pixels de hauteur, et autant de pixels que de hauteur
     tab = [ [255] * longueur] * hauteur
     return array(tab)
+
     
-def tab_image_noir(longueur: int, hauteur: int) -> ndarray:
+def tab_image_noire(longueur: int, hauteur: int) -> ndarray:
     """Génère un tableau contenant des pixels noirs avec les dimensions données"""
     # On crée autant de lignes que de pixels de hauteur, et autant de pixels que de hauteur
     tab = [ [0] * longueur] * hauteur
     return array(tab)
+
+
+def tab_image_grise(longueur: int, hauteur: int) -> ndarray:
+    """Génère un tableau contenant des pixels gris avec les dimensions données"""
+    # On crée autant de lignes que de pixels de hauteur, et autant de pixels que de hauteur
+    tab = [ [127] * longueur] * hauteur
+    return array(tab)
+
     
 def get_longueur_img(tab_img: ndarray) -> int:
     """Renvoie la longueur du tableau à deux dimensions (représentant une image) donné"""
     return len(tab_img[0])
 
+
 def get_hauteur_img(tab_img: ndarray) -> int:
     """Renvoie la hauteur du tableau à deux dimensions (représentant une image) donné"""
     return len(tab_img)
+
 
 def assombrir_pixel(tab_img: ndarray, ligne: int, colonne: int) -> ndarray:
     """Réduit de 51 (parce que c'est 255/5) les valeurs des couleurs du pixel à la position donnée."""
@@ -71,6 +82,15 @@ def assombrir_pixel(tab_img: ndarray, ligne: int, colonne: int) -> ndarray:
         tab_img[ligne][colonne] = tab_img[ligne][colonne] - 51
 
     return tab_img
+
+
+def eclaircir_pixel(tab_img: ndarray, ligne: int, colonne: int) -> ndarray:
+    """Augmente de 51 (parce que c'est 255/5) les valeurs des couleurs du pixel à la position donnée."""
+    if tab_img[ligne][colonne] <= 214:
+        tab_img[ligne][colonne] += 51
+
+    return tab_img
+
 
 def generer_clous(tab_img: ndarray) -> list:
     """Génère un tableau qui contient des tuples qui représentent des clous : deux coordonnées et un numéro de côté -> 0 pour le haut, 1 pour la droite, 2 pour le bas, 3 pour la gauche"""
@@ -90,12 +110,27 @@ def generer_clous(tab_img: ndarray) -> list:
 
     return liste_res
 
+
+def generer_clous_plus_clous_aleatoires(tab_img):
+    """Génère un tableau de clous classiques (cf generer_clous) + des clous aleatoires au milieu de l'image"""
+    h = get_hauteur_img(tab_img)
+    l = get_longueur_img(tab_img)
+
+    liste_res = generer_clous(tab_img)
+
+    for i in range(0, 200):
+        liste_res.append((randint(20, l - 20), randint(20, h - 20), i + 4))
+    
+    return liste_res
+
+
 def visible(clou1: tuple, clou2: tuple) -> bool:
     """Renvoie True si les clous se voient, False sinon"""
     return clou1[2] != clou2[2]
 
+
 def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
-    """Trace une droite d'un clou à un autre."""
+    """Trace une droite noire d'un clou à un autre."""
     if visible(clou1, clou2):
         liste_points = liste_points_traverses(clou1[0], clou1[1], clou2[0], clou2[1])
         
@@ -105,6 +140,20 @@ def tracer_droite(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
             image = assombrir_pixel(image, ligne, col)
 
     return image
+
+
+def tracer_droite_blanche(clou1: tuple, clou2: tuple, image: ndarray) -> ndarray:
+    """Trace une droite blanche d'un clou à un autre."""
+    if visible(clou1, clou2):
+        liste_points = liste_points_traverses(clou1[0], clou1[1], clou2[0], clou2[1])
+        
+        for i in range(0, len(liste_points)):
+            ligne = liste_points[i][1]
+            col = liste_points[i][0]
+            image = eclaircir_pixel(image, ligne, col)
+
+    return image
+
 
 def liste_points_traverses(x1: int, y1: int, x2: int, y2: int) -> list:
     """Renvoie les points que le segment [(x1, y1), (x2, y2)] traverse"""
@@ -173,7 +222,7 @@ def liste_clous_al(liste_clous : list, taille_l : int) -> list:
 
 
 def reduction_erreur_droite(clou_dep: tuple, clou_arr: tuple, img1: ndarray, img2: ndarray) -> float:
-    """Renvoie la différence entre l'erreur de l'image cible et de l'image actuelle, et l'erreur de l'image cible et de l'image actuelel si on traçait la droite donnée"""
+    """Renvoie la différence entre l'erreur de l'image cible et de l'image actuelle, et l'erreur de l'image cible et de l'image actuelel si on traçait la droite noire donnée"""
     
     if not visible(clou_dep, clou_arr):
         return 999999999
@@ -189,7 +238,29 @@ def reduction_erreur_droite(clou_dep: tuple, clou_arr: tuple, img1: ndarray, img
     new_err = 0
 
     for i in range(0, nb_pts):
-        new_err += erreur_point_trace(lst_pts[i], img1, img2)
+        new_err += erreur_point_assombri(lst_pts[i], img1, img2)
+    
+    return (new_err - err_act) / nb_pts
+
+
+def reduction_erreur_droite_blanche(clou_dep: tuple, clou_arr: tuple, img1: ndarray, img2: ndarray) -> float:
+    """Renvoie la différence entre l'erreur de l'image cible et de l'image actuelle, et l'erreur de l'image cible et de l'image actuelel si on traçait la droite blanche donnée"""
+    
+    if not visible(clou_dep, clou_arr):
+        return 999999999
+    
+
+    lst_pts = liste_points_traverses(clou_dep[0], clou_dep[1], clou_arr[0], clou_arr[1])
+    err_act = 0
+    nb_pts = len(lst_pts)
+
+    for i in range(0, nb_pts):
+        err_act += erreur_point(lst_pts[i], img1, img2)
+
+    new_err = 0
+
+    for i in range(0, nb_pts):
+        new_err += erreur_point_eclairci(lst_pts[i], img1, img2)
     
     return (new_err - err_act) / nb_pts
 
@@ -199,10 +270,18 @@ def erreur_point(p: tuple, img1: ndarray, img2: ndarray):
     return abs(img1[p[1]][p[0]] - img2[p[1]][p[0]])
 
 
-def erreur_point_trace(p: tuple, img1: ndarray, img2: ndarray):
+def erreur_point_assombri(p: tuple, img1: ndarray, img2: ndarray):
     """Renvoie la différence entre la valeur du pixel sur l'image 1 et la valeur du pixel sur l'image 2 lorsqu'on assombrit ce pixel"""
     if img2[p[1]][p[0]] >= 51:
         return abs(img1[p[1]][p[0]] - img2[p[1]][p[0]] + 51)
+    else:
+        return erreur_point(p, img1, img2)
+
+
+def erreur_point_eclairci(p: tuple, img1: ndarray, img2: ndarray):
+    """Renvoie la différence entre la valeur du pixel sur l'image 1 et la valeur du pixel sur l'image 2 lorsqu'on éclaircit ce pixel"""
+    if img2[p[1]][p[0]] <= 51:
+        return abs(img1[p[1]][p[0]] - img2[p[1]][p[0]] - 51)
     else:
         return erreur_point(p, img1, img2)
 
@@ -217,7 +296,20 @@ def trouve_meilleure_droite(img1: ndarray, img2: ndarray, clou_dep: tuple, lst_c
     
     red_err = min(liste_red_err)
     meilleur_clou = liste_c[liste_red_err.index(red_err)]
-    print(red_err, clou_dep, meilleur_clou)
+
+    return (meilleur_clou, red_err)
+
+
+def trouve_meilleure_droite_blanche(img1: ndarray, img2: ndarray, clou_dep: tuple, lst_clous: list) -> tuple:
+    """Renvoie le clou dont la droite blanche le traversant lui et le clou de départ réduit le plus l'erreur entre les deux images"""
+    liste_c = liste_clous_al(lst_clous, len(lst_clous) // 2)
+    liste_red_err = []
+
+    for i in range(0, len(liste_c)):
+        liste_red_err.append(reduction_erreur_droite_blanche(clou_dep, liste_c[i], img1, img2))
+    
+    red_err = min(liste_red_err)
+    meilleur_clou = liste_c[liste_red_err.index(red_err)]
 
     return (meilleur_clou, red_err)
 
@@ -237,19 +329,19 @@ def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = 
     while cpt_augmentation_err < 3:
         meilleur_clou, reduction_err = trouve_meilleure_droite(image, new_img, clou_dep, clous)
 
+        print(reduction_err, clou_dep, meilleur_clou)
+
         if reduction_err >= 0:
             cpt_augmentation_err += 1
         # On ne trace la droite que si elle réduit l'erreur
         else:
-            new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
+            cpt_augmentation_err = 0
+
+        new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
 
 
         clou_dep = meilleur_clou
         cpt_droites += 1
-
-        if cpt_droites % 5000 == 0:
-            img_prov = Image.fromarray(uint8(new_img))
-            img_prov.show()
 
     print(cpt_droites)
 
@@ -257,10 +349,100 @@ def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = 
     image_res.save("resultat/" + nom_image_sortie + ".png")
 
 
+def retrace_image_deux_fils(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec un fil noir et un fil blanc sur un fond gris et sauvegarde dans le dossier resultatnb, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_grise(get_longueur_img(image), get_hauteur_img(image))
+
+    clous = generer_clous(new_img)
+
+    clou_dep_noir = clous[0]
+    clou_dep_blanc = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 5:
+        meilleur_clou_noir, reduction_err_noire = trouve_meilleure_droite(image, new_img, clou_dep_noir, clous)
+        meilleur_clou_blanc, reduction_err_blanche = trouve_meilleure_droite_blanche(image, new_img, clou_dep_blanc, clous)
+
+        if reduction_err_noire <= reduction_err_blanche:
+
+            print(reduction_err_noire, clou_dep_noir, meilleur_clou_noir)
+
+            if reduction_err_noire >= 0:
+                cpt_augmentation_err += 1
+            # On ne trace la droite que si elle réduit l'erreur
+            else:
+                cpt_augmentation_err = 0
+
+            new_img = tracer_droite(clou_dep_noir, meilleur_clou_noir, new_img)
+
+
+            clou_dep_noir = meilleur_clou_noir
+            cpt_droites += 1
+
+        else:
+
+            print(reduction_err_blanche, clou_dep_blanc, meilleur_clou_blanc)
+
+            if reduction_err_blanche >= 0:
+                cpt_augmentation_err += 1
+            # On ne trace la droite que si elle réduit l'erreur
+            else:
+                cpt_augmentation_err = 0
+                
+            new_img = tracer_droite_blanche(clou_dep_blanc, meilleur_clou_blanc, new_img)
+
+
+            clou_dep_blanc = meilleur_clou_blanc
+            cpt_droites += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultatnb/" + nom_image_sortie + ".png")
+
+
+def retrace_image_clous_aleatoires(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec des fils et sauvegarde dans le dossier resultat, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
+
+    clous = generer_clous_plus_clous_aleatoires(new_img)
+
+    clou_dep = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 3:
+        meilleur_clou, reduction_err = trouve_meilleure_droite(image, new_img, clou_dep, clous)
+
+        print(reduction_err, clou_dep, meilleur_clou)
+
+        if reduction_err >= 0:
+            cpt_augmentation_err += 1
+        # On ne trace la droite que si elle réduit l'erreur
+        else:
+            cpt_augmentation_err = 0
+
+        new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
+
+
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultat-clous-al/" + nom_image_sortie + ".png")
+
+
 
 ### Tests ###
 
-retrace_image("images/oiseau.jpg", "oiseau-400px", True)
+retrace_image_clous_aleatoires("images/chateau.jpg", "chateau-400px", True)
 
 
 ### TODO ###
