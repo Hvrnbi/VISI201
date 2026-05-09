@@ -1,14 +1,15 @@
 ### Modules ###
 
-from PIL import Image
+from PIL import Image, ImageFilter
 from numpy import asarray, ndarray, array, uint8, delete
-from random import choices, randint
+from random import choices, randint, random
 from copy import deepcopy
+import drawsvg as dw
 
 
 ### Fonctions ###
 
-def import_image(chemin: str, resize: bool = False) -> ndarray :
+def import_image(chemin: str, resize: bool = False, lap: bool = False) -> ndarray :
     """Charge l'image donnée, la passe en nuances de gris, et la convertit en tableau (de numpy)"""
 
     ## Chargement de l'image ## 
@@ -34,7 +35,9 @@ def import_image(chemin: str, resize: bool = False) -> ndarray :
     image = image.convert("L")
 
     if resize:
-        image = image.resize((300, 400))
+        image = image.resize((400, 400))
+    if lap:
+        image = image.filter(ImageFilter.FIND_EDGES)
 
 
     ## Conversion en tableau ##
@@ -118,7 +121,7 @@ def generer_clous_plus_clous_aleatoires(tab_img):
 
     liste_res = generer_clous(tab_img)
 
-    for i in range(0, 200):
+    for i in range(0, 400):
         liste_res.append((randint(20, l - 20), randint(20, h - 20), i + 4))
     
     return liste_res
@@ -314,6 +317,55 @@ def trouve_meilleure_droite_blanche(img1: ndarray, img2: ndarray, clou_dep: tupl
     return (meilleur_clou, red_err)
 
 
+def generer_clous_lap(tab_img: ndarray) -> list:
+    """Génère un tableau qui contient des tuples qui représentent des clous : deux coordonnées et un numéro de côté -> 0 pour le haut, 1 pour la droite, 2 pour le bas, 3 pour la gauche"""
+    liste_res = []
+    
+    # On crée la matrice qui contient pour chaque pixel, la somme de sa valeur et de celle de tous les pixels d'avant
+    tab_somme = somme_cumulative_matrice(tab_img)
+    # Le dernier élément est la somme de la valeur de tous les pixels
+    somme_valeurs_px = tab_somme[-1][-1]
+
+    for i in range(600):
+        nb_rd = random() * somme_valeurs_px
+        pixel = trouve_pixel(tab_somme, nb_rd)
+        clou = (pixel[1], pixel[0], i)
+        liste_res.append(clou)
+        
+
+    return liste_res
+
+
+def somme_cumulative_matrice(tab: ndarray) -> list:
+    """Renvoie la somme cumulative de la matrice"""
+    liste_res = []
+
+    for i in range(len(tab)):
+        liste_res.append([])
+        for j in range(len(tab[i])):
+            if j == 0:
+                if i == 0:
+                    liste_res[i].append(int(tab[i][j]) ** 2)
+                else:
+                    liste_res[i].append(int(tab[i][j]) ** 2 + liste_res[i - 1][-1])
+            else:
+                liste_res[i].append(int(tab[i][j]) ** 2 + liste_res[i][j - 1])
+
+    return liste_res
+    
+
+def trouve_pixel(tab: list, nb: float) -> tuple:
+    """Renvoie les coordonnées du premier nombre dans la matrice qui est plus grand que le nombre donné"""
+    for i in range(len(tab)):
+        for j in range(len(tab[i])):
+            if tab[i][j] >= nb:
+                return (i, j)
+
+
+
+
+## Fonctions de retraçage ##
+
 def retrace_image(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
     """Retrace l'image donnée avec des fils et sauvegarde dans le dossier resultat, au chemin donné"""
     image = import_image(chemin_img_source, resize)
@@ -409,6 +461,8 @@ def retrace_image_clous_aleatoires(chemin_img_source: str, nom_image_sortie: str
     image = import_image(chemin_img_source, resize)
 
     new_img = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
+    svg = dw.Drawing(get_longueur_img(image), get_hauteur_img(image))
+    svg.append(dw.Rectangle(x=0, y=0, width='100%', height='100%', fill='white'))
 
     clous = generer_clous_plus_clous_aleatoires(new_img)
 
@@ -428,7 +482,7 @@ def retrace_image_clous_aleatoires(chemin_img_source: str, nom_image_sortie: str
             cpt_augmentation_err = 0
 
         new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
-
+        svg.append(dw.Line(clou_dep[0], clou_dep[1], meilleur_clou[0], meilleur_clou[1], stroke='black', stroke_opacity=0.2, stroke_width=1))
 
         clou_dep = meilleur_clou
         cpt_droites += 1
@@ -437,14 +491,132 @@ def retrace_image_clous_aleatoires(chemin_img_source: str, nom_image_sortie: str
 
     image_res = Image.fromarray(uint8(new_img))
     image_res.save("resultat-clous-al/" + nom_image_sortie + ".png")
+    svg.save_svg("resultat-clous-al/" + nom_image_sortie + ".svg")
 
 
+def retrace_image_clous_aleatoires_b_sur_n(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec des fils blancs sur fond noir et sauvegarde dans le dossier resultat, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_noire(get_longueur_img(image), get_hauteur_img(image))
+
+    clous = generer_clous_plus_clous_aleatoires(new_img)
+
+    clou_dep = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 3:
+        meilleur_clou, reduction_err = trouve_meilleure_droite_blanche(image, new_img, clou_dep, clous)
+
+        print(reduction_err, clou_dep, meilleur_clou)
+
+        if reduction_err >= 0:
+            cpt_augmentation_err += 1
+        # On ne trace la droite que si elle réduit l'erreur
+        else:
+            cpt_augmentation_err = 0
+
+        new_img = tracer_droite_blanche(clou_dep, meilleur_clou, new_img)
+
+
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultat-clous-al-bsn/" + nom_image_sortie + ".png")
+
+
+
+### Laplacien ###
+
+def retrace_avec_laplacien(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec des fils en s'aidant d'un filtre laplacien et sauvegarde dans le dossier resultat, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_blanche(get_longueur_img(image), get_hauteur_img(image))
+    svg = dw.Drawing(get_longueur_img(image), get_hauteur_img(image))
+    svg.append(dw.Rectangle(x=0, y=0, width='100%', height='100%', fill='white'))
+
+    image_lap = import_image(chemin_img_source, resize, lap=True)   # On importe l'image en laplacien grâce à lap=True
+
+    clous = generer_clous_lap(image_lap)
+
+    clou_dep = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 3:
+        meilleur_clou, reduction_err = trouve_meilleure_droite(image, new_img, clou_dep, clous)
+
+        print(reduction_err, clou_dep, meilleur_clou)
+
+        if reduction_err >= 0:
+            cpt_augmentation_err += 1
+        # On ne trace la droite que si elle réduit l'erreur
+        else:
+            cpt_augmentation_err = 0
+
+        new_img = tracer_droite(clou_dep, meilleur_clou, new_img)
+        svg.append(dw.Line(clou_dep[0], clou_dep[1], meilleur_clou[0], meilleur_clou[1], stroke='black', stroke_opacity=0.2, stroke_width=1))
+
+        # Image.fromarray(uint8(new_img)).save("gif-pommes/" + str(cpt_droites).zfill(5) + ".png")
+
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultat-laplacien/" + nom_image_sortie + ".png")
+    svg.save_svg("resultat-laplacien/" + nom_image_sortie + ".svg")
+
+
+def retrace_avec_laplacien_traits_blancs(chemin_img_source: str, nom_image_sortie: str, resize: bool = False):
+    """Retrace l'image donnée avec des fils blancs en s'aidant d'un filtre laplacien et sauvegarde dans le dossier resultat, au chemin donné"""
+    image = import_image(chemin_img_source, resize)
+
+    new_img = tab_image_noire(get_longueur_img(image), get_hauteur_img(image))
+    svg = dw.Drawing(get_longueur_img(image), get_hauteur_img(image))
+    svg.append(dw.Rectangle(x=0, y=0, width='100%', height='100%', fill='black'))
+
+    image_lap = import_image(chemin_img_source, resize, lap=True)   # On importe l'image en laplacien grâce à lap=True
+
+    clous = generer_clous_lap(image_lap)
+
+    clou_dep = clous[0]
+    cpt_augmentation_err = 0
+    cpt_droites = 0
+
+    while cpt_augmentation_err < 3:
+        meilleur_clou, reduction_err = trouve_meilleure_droite_blanche(image, new_img, clou_dep, clous)
+
+        print(reduction_err, clou_dep, meilleur_clou)
+
+        if reduction_err >= 0:
+            cpt_augmentation_err += 1
+        # On ne trace la droite que si elle réduit l'erreur
+        else:
+            cpt_augmentation_err = 0
+
+        new_img = tracer_droite_blanche(clou_dep, meilleur_clou, new_img)
+        svg.append(dw.Line(clou_dep[0], clou_dep[1], meilleur_clou[0], meilleur_clou[1], stroke='white', stroke_opacity=0.2, stroke_width=1))
+
+        # Image.fromarray(uint8(new_img)).save("gif-pommes/" + str(cpt_droites).zfill(5) + ".png")
+
+        clou_dep = meilleur_clou
+        cpt_droites += 1
+
+    print(cpt_droites)
+
+    image_res = Image.fromarray(uint8(new_img))
+    image_res.save("resultat-laplacien-bsn/" + nom_image_sortie + ".png")
+    svg.save_svg("resultat-laplacien-bsn/" + nom_image_sortie + ".svg")
 
 ### Tests ###
 
-retrace_image_clous_aleatoires("images/chateau.jpg", "chateau-400px", True)
+retrace_avec_laplacien_traits_blancs("images/hibou.jpg", "hibou-400px-600clous", True)
 
 
-### TODO ###
-
-# Pas forcément mesurer l'erreur d'une bande de quelques pixels au bord si on met les clous dedans
