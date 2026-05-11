@@ -14,6 +14,10 @@ def import_image(chemin: str, resize: tuple = (0, 0), lap: bool = False) -> ndar
 
     ## Chargement de l'image ## 
 
+    # gestion des chemins d'accès Windows avec les supers \
+    if chemin[:2] in ("c:\\", "C:\\"):
+        chemin.encode('unicode_escape')
+
     # On essaie d'ouvrir l'image avec la librairie PIL
     try:
         image = Image.open(chemin)
