@@ -25,7 +25,7 @@ Sous Debian Trixie par exemple, vous aurez besoin des packages python3-venv et p
 - Clonez ce répertoire à l'aide de la commande ```git clone  https://github.com/Hvrnbi/VISI201```
 - Déplacez vous dans le répertoire du projet avec la commande ```cd VISI201```
 - Créez un environnement virtuel Python avec la commande ```python3 -m venv .venv``` ou ```python -m venv .venv``` si vous utilisez Windows.
-- Installez les dépendances Python avec la commande ```.venv/bin.pip install -r requirements.txt``` ou ```.venv\Scripts\pip install -r requirements.txt``` si vous utilisez Windows
+- Installez les dépendances Python avec la commande ```.venv/bin/pip install -r requirements.txt``` ou ```.venv\Scripts\pip install -r requirements.txt``` si vous utilisez Windows
 - Créez le dossier qui accueillera les images résultats avec la commande ```mkdir resultats```
 - Ouvrez la console python avec la commande ```.venv/bin/python3```  ou ```.venv\Scripts\python```
 - Importez la fonction filage_image depuis la console Python ```from main import filage_image```
