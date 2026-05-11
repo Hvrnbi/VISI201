@@ -29,7 +29,7 @@ Sous Debian Trixie par exemple, vous aurez besoin des packages python3-venv et p
 - Créez le dossier qui accueillera les images résultats avec la commande ```mkdir resultats```
 - Ouvrez la console python avec la commande ```.venv/bin/python3```  ou ```.venv\Scripts\python```
 - Importez la fonction filage_image depuis la console Python ```from main import filage_image```
-- Enfin, lancez la fonction avec la commande Python suivante : ```filage_image("CHEMIN_VERS_L_IMAGE_DE_DEPART", "NOM_DE_L_IMAGE_DE_SORTIE", options...)``` La liste des options est disponible ci_dessous.
+- Enfin, lancez la fonction avec la commande Python suivante : ```filage_image("CHEMIN_VERS_L_IMAGE_DE_DEPART", "NOM_DE_L_IMAGE_DE_SORTIE", options...)``` La liste des options est disponible ci_dessous. Si vous utilisez Windows, remplacez le \ du chemin d'accès par un / ou deux \\.
 - Une fois l'exécution terminée, le résultat sera accessible dans le dossier resultats.
 
 ### Options
